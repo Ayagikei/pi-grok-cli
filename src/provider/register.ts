@@ -32,6 +32,7 @@ import { removeQuotaUsage } from './quotaCache.js';
 import { rememberRequestAccount } from './requestOwnership.js';
 import { registerExhaustionRotation } from './rotation.js';
 import { createSessionAccountSelection } from './sessionAccountSelection.js';
+import { createSessionConvId } from './sessionConvId.js';
 import { grokCliModelHeaders } from './stream.js';
 import { registerUsageCommand } from './usage.js';
 
@@ -53,6 +54,7 @@ function accountCredential(credentials: OAuthCredentials): AccountCredential {
 
 export default function registerGrokCli(pi: ExtensionAPI) {
   const sessionSelection = createSessionAccountSelection(pi);
+  const convIds = createSessionConvId(pi);
   let migrationWarning: string | undefined;
   let migrationError: string | undefined;
   let migrationErrorNotified = false;
@@ -177,6 +179,7 @@ export default function registerGrokCli(pi: ExtensionAPI) {
         void stream.result().then(
           (message) => {
             rememberRequestAccount(message, route.accountId);
+            convIds.rotateIfProxyError(options?.sessionId, message.errorMessage);
           },
           () => undefined,
         );
@@ -205,6 +208,7 @@ export default function registerGrokCli(pi: ExtensionAPI) {
 
   pi.on('session_start', async (_event, ctx) => {
     await migration;
+    convIds.restore(ctx);
     const accountId = sessionSelection.restore(ctx);
     if (accountId && !process.env.GROK_CLI_OAUTH_TOKEN) sessionSelection.select(ctx, accountId);
     if (migrationError && !migrationErrorNotified) {
@@ -229,25 +233,43 @@ export default function registerGrokCli(pi: ExtensionAPI) {
   });
 
   pi.on('session_tree', (_event, ctx) => {
+    convIds.restore(ctx);
     const accountId = sessionSelection.restore(ctx);
     if (accountId && !process.env.GROK_CLI_OAUTH_TOKEN) sessionSelection.select(ctx, accountId);
   });
 
   pi.on('session_shutdown', async (_event, ctx) => {
-    sessionSelection.clear(ctx.sessionManager.getSessionId());
+    const sessionId = ctx.sessionManager.getSessionId();
+    sessionSelection.clear(sessionId);
+    convIds.clear(sessionId);
     await accountManagement.closeDashboard();
   });
 
   pi.on('before_provider_headers', (event, ctx) => {
     if (ctx.model?.provider !== 'grok-cli') return;
-    event.headers['x-grok-conv-id'] = ctx.sessionManager.getSessionId();
+    event.headers['x-grok-conv-id'] =
+      convIds.convId(ctx.sessionManager.getSessionId()) ?? ctx.sessionManager.getSessionId();
   });
 
   pi.on('before_provider_request', (event, ctx) => {
     if (ctx.model?.provider !== 'grok-cli') return;
     const modelId = ctx.model?.id ?? '';
     const sessionId = ctx.sessionManager?.getSessionId();
-    return sanitizePayload(event.payload as Record<string, unknown>, modelId, sessionId, ctx.cwd);
+    return sanitizePayload(
+      event.payload as Record<string, unknown>,
+      modelId,
+      convIds.convId(sessionId),
+      ctx.cwd,
+    );
+  });
+
+  pi.on('message_end', (event, ctx) => {
+    if (ctx.model?.provider !== 'grok-cli') return;
+    const message = event.message;
+    const errorMessage = message.role === 'assistant' ? message.errorMessage : undefined;
+    const rotated = convIds.rotateIfProxyError(ctx.sessionManager.getSessionId(), errorMessage);
+    if (!rotated) return;
+    ctx.ui.notify('Grok CLI: proxy error; rotated conversation id.', 'warning');
   });
 
   registerUsageCommand(pi, resolveSessionRoute);

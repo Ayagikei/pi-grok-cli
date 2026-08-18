@@ -1082,6 +1082,72 @@ describe('Grok CLI provider registration', () => {
     expect(aliasResult).toBeUndefined();
   });
 
+  it('rotates grok conversation affinity after a proxy 502', async () => {
+    const extension = await setupExtension();
+    const ctx = {
+      ...sessionContext('session-123'),
+      cwd: process.cwd(),
+      model: { provider: 'grok-cli', id: 'grok-4.6' },
+    };
+
+    await extension.emit(
+      'message_end',
+      {
+        message: {
+          role: 'assistant',
+          provider: 'grok-cli',
+          errorMessage: 'OpenAI API error (502): 502 status code (no body)',
+        },
+      },
+      ctx,
+    );
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      'Grok CLI: proxy error; rotated conversation id.',
+      'warning',
+    );
+
+    const grokEvent = { headers: {} as Record<string, string> };
+    extension.handlers.get('before_provider_headers')?.(grokEvent, ctx);
+    expect(grokEvent.headers['x-grok-conv-id']).toBe('session-123:1');
+
+    const result = extension.handlers.get('before_provider_request')?.(
+      { payload: { input: [{ role: 'system', content: 'system instruction' }] } },
+      ctx,
+    );
+    expect(result).toMatchObject({ prompt_cache_key: 'session-123:1' });
+    expect(extension.entries).toContainEqual({
+      customType: 'grok-cli-conv-id-v1',
+      data: { generation: 1 },
+    });
+  });
+
+  it('restores a persisted conversation generation', async () => {
+    const extension = await setupExtension();
+    const ctx = {
+      cwd: process.cwd(),
+      model: { provider: 'grok-cli', id: 'grok-4.6' },
+      modelRegistry: { getAll: () => [] },
+      sessionManager: {
+        getSessionId: () => 'session-123',
+        getBranch: () => [
+          {
+            type: 'custom',
+            customType: 'grok-cli-conv-id-v1',
+            data: { generation: 2 },
+          },
+        ],
+      },
+      ui: { notify: vi.fn() },
+    };
+
+    await extension.emit('session_start', {}, ctx);
+
+    const grokEvent = { headers: {} as Record<string, string> };
+    extension.handlers.get('before_provider_headers')?.(grokEvent, ctx);
+    expect(grokEvent.headers['x-grok-conv-id']).toBe('session-123:2');
+  });
+
   it('leaves non-Grok provider requests untouched', async () => {
     const extension = await setupExtension();
     const payload = { input: [{ role: 'system', content: 'keep' }] };

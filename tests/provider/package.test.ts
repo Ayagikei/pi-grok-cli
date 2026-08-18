@@ -76,6 +76,7 @@ describe('repository layout', () => {
       'src/provider/requestOwnership.ts',
       'src/provider/rotation.ts',
       'src/provider/sessionAccountSelection.ts',
+      'src/provider/sessionConvId.ts',
       'src/provider/stream.ts',
       'src/provider/usage.ts',
       'src/shared/errors.ts',

@@ -1,6 +1,6 @@
 {
   "name": "pi-grok-cli",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Use your X Premium or SuperGrok subscription in pi.",
   "keywords": [
     "pi-package",
@@ -41,7 +41,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kenryu42/pi-grok-cli.git"
+    "url": "git+https://github.com/Ayagikei/pi-grok-cli.git"
   },
   "bugs": {
     "url": "https://github.com/kenryu42/pi-grok-cli/issues"
