@@ -31,6 +31,13 @@ export function createSessionConvId(pi: Pick<ExtensionAPI, 'appendEntry'>) {
     return generation > 0 ? `${sessionId}:${generation}` : sessionId;
   };
 
+  const persist = (sessionId: string) => {
+    const generation = (generations.get(sessionId) ?? 0) + 1;
+    generations.set(sessionId, generation);
+    pi.appendEntry(SESSION_CONV_ENTRY, { generation });
+    return convId(sessionId);
+  };
+
   return {
     convId,
     restore(ctx: Pick<ExtensionContext, 'sessionManager'>) {
@@ -45,6 +52,11 @@ export function createSessionConvId(pi: Pick<ExtensionAPI, 'appendEntry'>) {
       if (!restored) generations.delete(sessionId);
       return convId(sessionId);
     },
+    rotate(sessionId: string | undefined) {
+      if (!sessionId) return undefined;
+      lastRotate.delete(sessionId);
+      return persist(sessionId);
+    },
     rotateIfProxyError(sessionId: string | undefined, errorMessage: unknown) {
       if (!sessionId || !isProxySessionError(errorMessage)) return undefined;
       const now = Date.now();
@@ -53,9 +65,7 @@ export function createSessionConvId(pi: Pick<ExtensionAPI, 'appendEntry'>) {
         return undefined;
       }
       lastRotate.set(sessionId, { errorMessage: String(errorMessage), at: now });
-      generations.set(sessionId, (generations.get(sessionId) ?? 0) + 1);
-      pi.appendEntry(SESSION_CONV_ENTRY, { generation: generations.get(sessionId) });
-      return convId(sessionId);
+      return persist(sessionId);
     },
     clear(sessionId: string) {
       generations.delete(sessionId);

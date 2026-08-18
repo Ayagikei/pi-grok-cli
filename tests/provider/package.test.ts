@@ -71,6 +71,7 @@ describe('repository layout', () => {
       'src/provider/billing.ts',
       'src/provider/dashboard/server.ts',
       'src/provider/modelMigration.ts',
+      'src/provider/proxyRetry.ts',
       'src/provider/quotaCache.ts',
       'src/provider/register.ts',
       'src/provider/requestOwnership.ts',

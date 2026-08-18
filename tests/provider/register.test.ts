@@ -1148,6 +1148,25 @@ describe('Grok CLI provider registration', () => {
     expect(grokEvent.headers['x-grok-conv-id']).toBe('session-123:2');
   });
 
+  it('lets /grok-cli-conv rotate the conversation id immediately', async () => {
+    const extension = await setupExtension();
+    const ctx = {
+      ...sessionContext('session-123'),
+      cwd: process.cwd(),
+      model: { provider: 'grok-cli', id: 'grok-4.6' },
+    };
+
+    await extension.commands.get('grok-cli-conv')?.handler('status' as never, ctx);
+    expect(ctx.ui.notify).toHaveBeenCalledWith('Grok CLI conv-id: session-123', 'info');
+
+    await extension.commands.get('grok-cli-conv')?.handler('rotate' as never, ctx);
+    expect(ctx.ui.notify).toHaveBeenCalledWith('Grok CLI conv-id rotated to session-123:1', 'info');
+
+    const grokEvent = { headers: {} as Record<string, string> };
+    extension.handlers.get('before_provider_headers')?.(grokEvent, ctx);
+    expect(grokEvent.headers['x-grok-conv-id']).toBe('session-123:1');
+  });
+
   it('leaves non-Grok provider requests untouched', async () => {
     const extension = await setupExtension();
     const payload = { input: [{ role: 'system', content: 'keep' }] };

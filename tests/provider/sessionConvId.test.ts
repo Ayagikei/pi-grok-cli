@@ -76,4 +76,13 @@ describe('Pi session conversation id', () => {
     expect(convIds.restore(context('session-a', [1, 3]))).toBe('session-a:3');
     expect(convIds.convId('session-a')).toBe('session-a:3');
   });
+
+  it('rotates immediately without a proxy error', () => {
+    const appendEntry = vi.fn();
+    const convIds = createSessionConvId({ appendEntry } as unknown as ExtensionAPI);
+
+    expect(convIds.rotate('session-a')).toBe('session-a:1');
+    expect(convIds.rotate('session-a')).toBe('session-a:2');
+    expect(appendEntry).toHaveBeenNthCalledWith(2, SESSION_CONV_ENTRY, { generation: 2 });
+  });
 });

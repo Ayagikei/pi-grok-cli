@@ -28,6 +28,7 @@ import {
   mutateAccountVault,
 } from './accountVault.js';
 import { migrateSavedModelProviders } from './modelMigration.js';
+import { streamWithProxyRetry } from './proxyRetry.js';
 import { removeQuotaUsage } from './quotaCache.js';
 import { rememberRequestAccount } from './requestOwnership.js';
 import { registerExhaustionRotation } from './rotation.js';
@@ -164,26 +165,33 @@ export default function registerGrokCli(pi: ExtensionAPI) {
         await migration;
         if (migrationError) throw new Error(migrationError);
         const route = await resolveAccountRoute(accountId);
-        const stream = streamSimpleOpenAIResponses(
-          {
-            ...model,
-            baseUrl: route.baseUrl,
-            api: 'openai-responses',
-          } as Model<'openai-responses'>,
-          context,
-          {
-            ...options,
-            apiKey: route.token,
-          },
-        );
-        void stream.result().then(
-          (message) => {
-            rememberRequestAccount(message, route.accountId);
-            convIds.rotateIfProxyError(options?.sessionId, message.errorMessage);
-          },
-          () => undefined,
-        );
-        return stream;
+        const start = (affinity?: string) =>
+          streamSimpleOpenAIResponses(
+            {
+              ...model,
+              baseUrl: route.baseUrl,
+              api: 'openai-responses',
+            } as Model<'openai-responses'>,
+            context,
+            {
+              ...options,
+              apiKey: route.token,
+              ...(affinity
+                ? {
+                    headers: { ...options?.headers, 'x-grok-conv-id': affinity },
+                    onPayload: (payload: unknown) => {
+                      if (!payload || typeof payload !== 'object') return;
+                      return { ...payload, prompt_cache_key: affinity };
+                    },
+                  }
+                : {}),
+            },
+          );
+        return streamWithProxyRetry({
+          start: () => start(),
+          retry: () => start(convIds.rotate(options?.sessionId)),
+          onMessage: (message) => rememberRequestAccount(message, route.accountId),
+        });
       });
     },
   });
@@ -272,5 +280,22 @@ export default function registerGrokCli(pi: ExtensionAPI) {
     ctx.ui.notify('Grok CLI: proxy error; rotated conversation id.', 'warning');
   });
 
+  pi.registerCommand('grok-cli-conv', {
+    description: 'Show or rotate the Grok CLI conversation id',
+    handler: async (args, ctx) => {
+      const argument = args.trim().toLowerCase();
+      if (argument && argument !== 'status' && argument !== 'rotate') {
+        ctx.ui.notify('Usage: /grok-cli-conv [status|rotate]', 'error');
+        return;
+      }
+      convIds.restore(ctx);
+      const sessionId = ctx.sessionManager.getSessionId();
+      if (argument === 'rotate') {
+        ctx.ui.notify(`Grok CLI conv-id rotated to ${convIds.rotate(sessionId)}`, 'info');
+        return;
+      }
+      ctx.ui.notify(`Grok CLI conv-id: ${convIds.convId(sessionId)}`, 'info');
+    },
+  });
   registerUsageCommand(pi, resolveSessionRoute);
 }
