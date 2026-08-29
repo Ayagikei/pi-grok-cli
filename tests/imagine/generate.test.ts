@@ -67,4 +67,24 @@ describe('generateImage', () => {
     await expect(result).resolves.toEqual({ b64: '/9j/2Q==', mimeType: 'image/jpeg' });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
+
+  it('edits a source image through /images/edits', async () => {
+    let url = '';
+    let body = '';
+    await generateImage({
+      token: 'secret',
+      prompt: 'keep layout, translate labels',
+      imageUrl: 'data:image/png;base64,aaa',
+      fetchImpl: async (input, init) => {
+        url = String(input);
+        body = String(init?.body);
+        return Response.json({ data: [{ b64_json: '/9j/2Q==' }] });
+      },
+    });
+    expect(url).toBe('https://api.x.ai/v1/images/edits');
+    expect(JSON.parse(body).image).toEqual({
+      url: 'data:image/png;base64,aaa',
+      type: 'image_url',
+    });
+  });
 });

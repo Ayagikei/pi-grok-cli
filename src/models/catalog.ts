@@ -88,6 +88,10 @@ const FALLBACK_MODELS: GrokCliModelConfig[] = [
     cost: COST_46,
     contextWindow: 500_000,
     maxTokens: 30_000,
+    // cli-chat-proxy 已为 grok-4.6 暴露 xhigh（Extra High Effort）；Pi 需要显式 map 才会在 UI 中可选。
+    thinkingLevelMap: {
+      xhigh: 'xhigh',
+    },
   },
   {
     id: 'grok-4.20-0309-reasoning',

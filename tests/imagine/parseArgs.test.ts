@@ -25,6 +25,12 @@ describe('parseImagineArgs', () => {
       aspectRatio: 'auto',
       resolution: '1k',
     });
+    expect(parseImagineArgs('--image ./hero.webp translate the UI to Chinese')).toEqual({
+      prompt: 'translate the UI to Chinese',
+      aspectRatio: 'auto',
+      imagePath: './hero.webp',
+      resolution: '1k',
+    });
   });
 
   it('rejects empty prompts, unknown flags, missing values, and unsupported resolution', () => {

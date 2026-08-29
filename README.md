@@ -15,7 +15,7 @@ Use your X Premium or SuperGrok subscription in [pi](https://pi.dev/) with a cle
 - **OAuth login:** Sign in through a browser or device code with automatic token refresh.
 - **Multiple accounts:** Manage accounts and quotas from the terminal or browser dashboard, and automatically continue with another account when quota runs out.
 - **Usage tracking:** Check subscription tier, weekly allowance usage, and reset times.
-- **Image generation:** Generate images directly or let Grok use the `image_gen` tool.
+- **Image generation and editing:** Generate images, or pass `--image` / `image_gen.image` to edit a local file with Grok Imagine.
 - **Native image input:** Send images directly to supported Grok models, including Composer 2.5.
 
 > Requires pi 0.80.9 or newer and an xAI/Grok account with access to the selected model. Availability varies by account, plan, region, and xAI rollout. The Grok Build executable is not required.
@@ -112,6 +112,14 @@ Models are bundled rather than discovered live. Registered context limits may di
 
 Run `/grok-cli-imagine <prompt>` to generate and preview a JPEG, or let any active model call the `image_gen` tool. Images use the current session's selected Grok account and are saved under the current session unless you request another path.
 
+To edit an existing image instead of generating from scratch, pass a local file:
+
+```text
+/grok-cli-imagine --image ./hero.webp translate the UI text to Simplified Chinese
+```
+
+The `image_gen` tool accepts the same `image` path. New sessions, including subagents, use the vault's active Grok account.
+
 `image_gen` is enabled by default across providers. Use `/grok-cli-imagine:tool [on|off|status]` to manage model access without disabling the direct command.
 
 ## Commands
@@ -120,7 +128,7 @@ Run `/grok-cli-imagine <prompt>` to generate and preview a JPEG, or let any acti
 | --- | --- |
 | `/grok-cli-accounts [gui]` | Manage Grok accounts in the terminal, or add `gui` for the browser dashboard. |
 | `/grok-cli-usage` | Fetch current quota, update its cache, and show cached data if refresh fails. |
-| `/grok-cli-imagine <prompt>` | Generate and preview an image. Supports `--aspect`, `--out`, and `--resolution 1k`. |
+| `/grok-cli-imagine <prompt>` | Generate or edit an image. Supports `--aspect`, `--out`, `--image`/`--edit`, and `--resolution 1k`. |
 | `/grok-cli-imagine:tool [on\|off\|status]` | Toggle, set, or report persistent model-callable `image_gen` availability. |
 
 ## Configuration

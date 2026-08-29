@@ -1,3 +1,6 @@
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { describe, expect, it, vi } from 'vitest';
 import { registerImageGenTool } from '../../src/imagine/tool.js';
@@ -94,6 +97,26 @@ describe('image_gen tool', () => {
 
     expect(resolveToken).toHaveBeenCalledWith(test.context);
     expect(test.generate).toHaveBeenCalledWith(expect.objectContaining({ token: 'session-token' }));
+  });
+
+  it('edits a local image when image is set', async () => {
+    const test = setup('token');
+    const filePath = join(tmpdir(), `pi-grok-cli-edit-${Date.now()}.png`);
+    writeFileSync(filePath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]));
+
+    await test.tool.execute(
+      'call',
+      { prompt: 'translate UI text', image: filePath },
+      undefined,
+      undefined,
+      test.context,
+    );
+
+    expect(test.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        imageUrl: `data:image/png;base64,${Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]).toString('base64')}`,
+      }),
+    );
   });
 
   it('requires exactly one call for singular requests while allowing explicit multiples', () => {

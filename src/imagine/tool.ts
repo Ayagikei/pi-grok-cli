@@ -1,3 +1,4 @@
+import { isAbsolute, resolve } from 'node:path';
 import { Type } from '@earendil-works/pi-ai';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { Text } from '@earendil-works/pi-tui';
@@ -11,12 +12,21 @@ import {
 } from './workflow.js';
 
 const ImageGenParams = Type.Object({
-  prompt: Type.String({ description: 'Text description of the image to generate.' }),
+  prompt: Type.String({
+    description:
+      'Text description of the image to generate, or of the edit to apply when image is set.',
+  }),
   aspect_ratio: Type.Optional(
     Type.String({
       description:
         "Aspect ratio of the generated image. Defaults to 'auto'. Examples: 1:1, 16:9, 9:16, 3:2, 2:3.",
       default: 'auto',
+    }),
+  ),
+  image: Type.Optional(
+    Type.String({
+      description:
+        'Local path to a source image. When set, Imagine edits that image instead of generating from scratch.',
     }),
   ),
 });
@@ -47,9 +57,10 @@ export function registerImageGenTool(
     name: 'image_gen',
     label: 'Image Gen',
     description:
-      "Generate a new image from a text description using Imagine; returns the saved image's absolute path. For a request for one image, call this tool exactly once. Call it multiple times only when the user explicitly requests multiple images. Do not re-read or re-display the image unless the user asks.",
+      "Generate or edit an image with Grok Imagine. Pass image to edit a local file instead of generating from scratch. Returns the saved image's absolute path. For a request for one image, call this tool exactly once. Call it multiple times only when the user explicitly requests multiple images. Do not re-read or re-display the image unless the user asks.",
     promptGuidelines: [
       'For a request for one image, call image_gen exactly once. Call it multiple times only when the user explicitly requests multiple images.',
+      'To edit an existing image, set image to a local file path and describe only the change in prompt. Keep generate-from-scratch prompts in prompt with image omitted.',
       'Do not repeat the saved path unless the user asks for it; the image_gen result already displays a copyable path.',
     ],
     parameters: ImageGenParams,
@@ -58,8 +69,18 @@ export function registerImageGenTool(
         const prompt = params.prompt.trim();
         if (!prompt) throw new Error('Prompt is required');
         const aspectRatio = normalizeAspectRatio(params.aspect_ratio);
+        const image = params.image?.trim();
+        const cwd = 'cwd' in ctx && typeof ctx.cwd === 'string' ? ctx.cwd : undefined;
         const saved = await generateAndSaveImage(
-          { ctx, prompt, aspectRatio, signal },
+          {
+            ctx,
+            prompt,
+            aspectRatio,
+            signal,
+            ...(image
+              ? { imagePath: isAbsolute(image) ? image : resolve(cwd ?? process.cwd(), image) }
+              : {}),
+          },
           dependencies,
           resolveToken,
         );

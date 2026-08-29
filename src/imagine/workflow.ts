@@ -2,6 +2,7 @@ import type { ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { convertToPng } from '@earendil-works/pi-coding-agent';
 import { IMAGINE_AUTH_ERROR, resolveImagineToken } from './auth.js';
 import { generateImage } from './generate.js';
+import { imageFileToDataUri } from './imageUrl.js';
 import { saveImage, savePreviewImage } from './save.js';
 
 export type ImagineDependencies = {
@@ -31,6 +32,7 @@ export async function generateAndSaveImage(
     prompt: string;
     aspectRatio: string;
     resolution?: string;
+    imagePath?: string;
     signal?: AbortSignal;
     outPath?: string;
   },
@@ -45,6 +47,7 @@ export async function generateAndSaveImage(
     aspectRatio: options.aspectRatio,
     resolution: options.resolution,
     signal: options.signal,
+    ...(options.imagePath ? { imageUrl: imageFileToDataUri(options.imagePath) } : {}),
   });
   const persisted = options.ctx.sessionManager.getSessionFile() !== undefined;
   const saved = await dependencies.saveImage({

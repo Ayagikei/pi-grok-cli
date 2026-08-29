@@ -63,7 +63,7 @@ export function registerImagineFeature(
   });
 
   pi.registerCommand('grok-cli-imagine', {
-    description: 'Generate an image with Grok Imagine',
+    description: 'Generate or edit an image with Grok Imagine',
     handler: async (args, ctx) => {
       try {
         const parsed = parseImagineArgs(args);
@@ -75,6 +75,13 @@ export function registerImagineFeature(
             aspectRatio: parsed.aspectRatio,
             resolution: parsed.resolution,
             signal: ctx.signal,
+            ...(parsed.imagePath
+              ? {
+                  imagePath: isAbsolute(parsed.imagePath)
+                    ? parsed.imagePath
+                    : resolve(ctx.cwd, parsed.imagePath),
+                }
+              : {}),
             outPath: parsed.outPath
               ? isAbsolute(parsed.outPath)
                 ? parsed.outPath

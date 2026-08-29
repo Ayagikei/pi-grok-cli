@@ -226,14 +226,19 @@ describe('vault account management', () => {
     await expect(accounts.activate(ctx, account.id)).rejects.toThrow('before making it active');
   });
 
-  it('activates an account only for the current Pi session', async () => {
+  it('activates an account for this session and the vault default used by new sessions', async () => {
     const test = await selectedLoggedInAccount();
 
     expect(test.appendEntry).toHaveBeenCalledWith('grok-cli-active-account-v1', {
       accountId: test.account.id,
     });
-    expect((await getAccountVault()).activeAccountId).toBe('account-1');
+    expect((await getAccountVault()).activeAccountId).toBe(test.account.id);
     expect(test.accounts.snapshot(ctx).accounts[1]).toMatchObject({ active: true });
+    expect(
+      test.accounts.snapshot({
+        sessionManager: { getSessionId: () => 'session-b', getBranch: () => [] },
+      } as unknown as ExtensionContext).accounts[1],
+    ).toMatchObject({ active: true });
   });
 
   it('selects another logged-in account when the active account logs out', async () => {

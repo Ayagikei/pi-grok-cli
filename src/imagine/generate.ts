@@ -98,13 +98,15 @@ export async function generateImage(options: {
   prompt: string;
   aspectRatio?: string;
   resolution?: string;
+  imageUrl?: string;
   baseUrl?: string;
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
 }) {
+  const editing = Boolean(options.imageUrl);
   const response = await requestWithRetry(
     options.fetchImpl ?? fetch,
-    `${(options.baseUrl ?? process.env.PI_GROK_CLI_IMAGINE_BASE_URL ?? 'https://api.x.ai/v1').replace(/\/+$/, '')}/images/generations`,
+    `${(options.baseUrl ?? process.env.PI_GROK_CLI_IMAGINE_BASE_URL ?? 'https://api.x.ai/v1').replace(/\/+$/, '')}/images/${editing ? 'edits' : 'generations'}`,
     {
       method: 'POST',
       headers: {
@@ -121,6 +123,7 @@ export async function generateImage(options: {
         aspect_ratio: normalizeAspectRatio(options.aspectRatio),
         resolution: options.resolution ?? '1k',
         response_format: 'b64_json',
+        ...(options.imageUrl ? { image: { url: options.imageUrl, type: 'image_url' } } : {}),
       }),
       signal: options.signal,
     },
