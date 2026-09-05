@@ -758,6 +758,72 @@ describe('Grok CLI provider registration', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
+  it('retries a proxy 401 without replacing the payload hook', async () => {
+    await setAccount1Credential('one');
+    writePiVaultMarker();
+    const onPayload = vi.fn();
+    const failed = {
+      role: 'assistant' as const,
+      content: [],
+      api: 'openai-responses' as const,
+      provider: 'grok-cli',
+      model: 'grok-4.6',
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'error' as const,
+      errorMessage: 'OpenAI API error (401): 401 "Authentication required"',
+      timestamp: 1,
+    };
+    mockProviderStream
+      .mockImplementationOnce(() => ({
+        async *[Symbol.asyncIterator]() {
+          yield { type: 'error', reason: 'error', error: failed };
+        },
+        result: async () => failed,
+      }))
+      .mockImplementationOnce(() => ({
+        async *[Symbol.asyncIterator]() {},
+        result: vi.fn(async () => ({
+          role: 'assistant',
+          content: [],
+          api: 'openai-responses',
+          provider: 'grok-cli',
+          model: 'grok-build',
+          usage: failed.usage,
+          stopReason: 'stop',
+          timestamp: Date.now(),
+        })),
+      }));
+    const extension = await setupExtension();
+    const provider = extension.providers.get('grok-cli');
+    const model = provider?.models?.[0];
+    if (!model) throw new Error('Grok CLI test model is missing.');
+
+    await drain(
+      provider.streamSimple?.(
+        {
+          ...model,
+          provider: 'grok-cli',
+          api: 'openai-responses',
+          baseUrl: 'https://cli-chat-proxy.grok.com',
+        },
+        { messages: [] },
+        { sessionId: 'session-a', onPayload },
+      ),
+    );
+
+    expect(mockProviderStream).toHaveBeenCalledTimes(2);
+    expect(mockProviderStream.mock.calls[0]?.[2]?.onPayload).toBe(onPayload);
+    expect(mockProviderStream.mock.calls[1]?.[2]?.onPayload).toBe(onPayload);
+    expect(mockProviderStream.mock.calls[1]?.[2]?.headers?.['x-grok-conv-id']).toBe('session-a:1');
+  });
+
   it('stores the default account in a new Pi session', async () => {
     await setAccount1Credential('one');
     const extension = await setupExtension();

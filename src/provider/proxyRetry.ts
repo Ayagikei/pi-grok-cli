@@ -56,6 +56,8 @@ function createPassThrough() {
   };
 }
 
+const PROXY_RETRIES = 2;
+
 export function streamWithProxyRetry(options: {
   start: () => ProviderStream;
   retry: () => ProviderStream;
@@ -63,29 +65,29 @@ export function streamWithProxyRetry(options: {
 }) {
   const outer = createPassThrough();
   void (async () => {
-    const first = options.start();
-    for await (const event of first) {
-      if (isProxySessionError(errorMessageOf(event))) {
-        const second = options.retry();
-        for await (const retryEvent of second) outer.push(retryEvent);
-        const message = await second.result();
-        options.onMessage(message);
-        outer.end(message);
-        return;
+    let stream = options.start();
+    for (let attempt = 0; ; attempt++) {
+      let replay = false;
+      for await (const event of stream) {
+        if (isProxySessionError(errorMessageOf(event)) && attempt < PROXY_RETRIES) {
+          replay = true;
+          break;
+        }
+        outer.push(event);
       }
-      outer.push(event);
-    }
-    const message = await first.result();
-    if (isProxySessionError(message.errorMessage)) {
-      const second = options.retry();
-      for await (const retryEvent of second) outer.push(retryEvent);
-      const retried = await second.result();
-      options.onMessage(retried);
-      outer.end(retried);
+      if (replay) {
+        stream = options.retry();
+        continue;
+      }
+      const message = await stream.result();
+      if (isProxySessionError(message.errorMessage) && attempt < PROXY_RETRIES) {
+        stream = options.retry();
+        continue;
+      }
+      options.onMessage(message);
+      outer.end(message);
       return;
     }
-    options.onMessage(message);
-    outer.end(message);
   })().catch((error) => {
     const message = {
       role: 'assistant',

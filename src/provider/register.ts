@@ -178,11 +178,9 @@ export default function registerGrokCli(pi: ExtensionAPI) {
               apiKey: route.token,
               ...(affinity
                 ? {
+                    // ponytail: only rotate x-grok-conv-id. Rotating prompt_cache_key
+                    // busts ~240k prefix cache and the uncached retry is what still 401s.
                     headers: { ...options?.headers, 'x-grok-conv-id': affinity },
-                    onPayload: (payload: unknown) => {
-                      if (!payload || typeof payload !== 'object') return;
-                      return { ...payload, prompt_cache_key: affinity };
-                    },
                   }
                 : {}),
             },
