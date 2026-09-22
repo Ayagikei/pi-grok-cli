@@ -21,4 +21,8 @@ describe('grokCliModelHeaders', () => {
   it('binds x-grok-model-override to the model id', () => {
     expect(grokCliModelHeaders('grok-build')['x-grok-model-override']).toBe('grok-build');
   });
+
+  it('strips :fast from x-grok-model-override', () => {
+    expect(grokCliModelHeaders('grok-4.6:fast')['x-grok-model-override']).toBe('grok-4.6');
+  });
 });

@@ -15,7 +15,7 @@ import * as oauth from '../auth/oauth.js';
 import { getBaseUrl } from '../auth/oauth.js';
 import { migrateLegacyConfig } from '../config.js';
 import { registerImagineFeature, syncImageToolPreference } from '../imagine/register.js';
-import { resolveModels } from '../models/catalog.js';
+import { resolveSelectableModels } from '../models/catalog.js';
 import { sanitizePayload } from '../payload/sanitize.js';
 import { confirmMarkerInstallation, migrateReleasedAccounts } from './accountMigration.js';
 import { resolveAccountRoute } from './accountRouting.js';
@@ -148,7 +148,7 @@ export default function registerGrokCli(pi: ExtensionAPI) {
     baseUrl: getBaseUrl(),
     ...(environmentApiKey ? { apiKey: environmentApiKey } : { oauth: oauthProvider }),
     api: 'openai-responses',
-    models: resolveModels().map((model) => ({
+    models: resolveSelectableModels().map((model) => ({
       id: model.id,
       name: model.name,
       reasoning: model.reasoning,

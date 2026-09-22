@@ -17,6 +17,30 @@ const sanitizeReasoning = (
   );
 
 describe('payload sanitization', () => {
+  it('requests priority service tier for :fast models and rewrites the wire model id', () => {
+    const payload = sanitizePayload(
+      { model: 'grok-4.6:fast', input: 'ok' },
+      'grok-cli/grok-4.6:fast',
+      undefined,
+      process.cwd(),
+    );
+
+    expect(payload.service_tier).toBe('priority');
+    expect(payload.model).toBe('grok-4.6');
+  });
+
+  it('leaves base models on the default service tier', () => {
+    const payload = sanitizePayload(
+      { model: 'grok-4.6', input: 'ok' },
+      'grok-4.6',
+      undefined,
+      process.cwd(),
+    );
+
+    expect(payload.service_tier).toBeUndefined();
+    expect(payload.model).toBe('grok-4.6');
+  });
+
   it('removes unsupported items and moves all instructions', () => {
     const payload = sanitizePayload(
       {

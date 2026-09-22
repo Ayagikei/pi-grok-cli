@@ -102,9 +102,14 @@ Models are bundled rather than discovered live. Registered context limits may di
 | `grok-4.3` | 1M | yes | text + image |
 | `grok-4.5` | 500K | yes | text + image |
 | `grok-4.6` | 500K | yes | text + image |
+| `grok-4.6:fast` | 500K | yes | text + image |
+| `grok-4.7` | 500K | yes | text + image |
+| `grok-4.7-build-fast` | 500K | yes | text + image |
 | `grok-4.20-0309-reasoning` | 2M | yes | text + image |
 | `grok-4.20-0309-non-reasoning` | 2M | no | text + image |
 | `grok-4.20-multi-agent-0309` | 2M | yes | text + image |
+
+Every bundled model also has a virtual `:fast` alias, for example `/model grok-cli/grok-4.6:fast`. That is the same model with `service_tier: "priority"` on `cli-chat-proxy.grok.com` — lower latency when xAI grants it, billed at about 2×. `grok-4.7-build-fast` is a real Grok Build slug, not that alias.
 
 ## Media
 

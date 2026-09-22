@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   resolveModels,
+  resolveSelectableModels,
   supportsReasoning,
   supportsReasoningEffort,
 } from '../../src/models/catalog.js';
@@ -16,7 +17,10 @@ describe('model catalog', () => {
     expect(supportsReasoningEffort('grok-4.3')).toBe(true);
     expect(supportsReasoningEffort('grok-4.5')).toBe(true);
     expect(supportsReasoningEffort('grok-4.6')).toBe(true);
+    expect(supportsReasoningEffort('grok-4.7')).toBe(true);
+    expect(supportsReasoningEffort('grok-4.7-build-fast')).toBe(true);
     expect(supportsReasoningEffort('grok-cli/GROK-COMPOSER-2.5-fast')).toBe(false);
+    expect(supportsReasoningEffort('grok-4.6:fast')).toBe(true);
     expect(supportsReasoningEffort('grok-4.20-0309-non-reasoning')).toBe(false);
   });
 
@@ -24,6 +28,7 @@ describe('model catalog', () => {
     expect(supportsReasoning('grok-cli/GROK-BUILD')).toBe(true);
     expect(supportsReasoning('grok-cli/GROK-4.6')).toBe(true);
     expect(supportsReasoning('grok-cli/GROK-COMPOSER-2.5-fast')).toBe(false);
+    expect(supportsReasoning('grok-cli/grok-4.6:fast')).toBe(true);
     expect(supportsReasoning('grok-4.20-0309-non-reasoning')).toBe(false);
   });
 
@@ -38,6 +43,8 @@ describe('model catalog', () => {
       'grok-4.3',
       'grok-4.5',
       'grok-4.6',
+      'grok-4.7',
+      'grok-4.7-build-fast',
       'grok-4.20-0309-reasoning',
       'grok-4.20-0309-non-reasoning',
       'grok-4.20-multi-agent-0309',
@@ -65,6 +72,26 @@ describe('model catalog', () => {
       cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
       thinkingLevelMap: { xhigh: 'xhigh' },
     });
+    expect(models.filter((model) => model.id.startsWith('grok-4.7'))).toEqual([
+      expect.objectContaining({
+        id: 'grok-4.7',
+        name: 'Grok 4.7',
+        reasoning: true,
+        input: ['text', 'image'],
+        contextWindow: 500_000,
+        cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+        thinkingLevelMap: { xhigh: 'xhigh' },
+      }),
+      expect.objectContaining({
+        id: 'grok-4.7-build-fast',
+        name: 'Grok 4.7 Fast',
+        reasoning: true,
+        input: ['text', 'image'],
+        contextWindow: 500_000,
+        cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
+        thinkingLevelMap: { xhigh: 'xhigh' },
+      }),
+    ]);
   });
 
   it('filters, reorders, and fills unknown model overrides', () => {
@@ -82,5 +109,22 @@ describe('model catalog', () => {
     });
     expect(models[1].name).toBe('Grok Build');
     expect(supportsReasoning('grok-cli/CUSTOM-MODEL')).toBe(true);
+  });
+
+  it('exposes :fast virtual models without changing the base catalog', () => {
+    delete process.env.PI_GROK_CLI_MODELS;
+
+    const base = resolveModels();
+    const selectable = resolveSelectableModels();
+
+    expect(base.map((model) => model.id)).not.toContain('grok-4.6:fast');
+    expect(selectable.map((model) => model.id)).toContain('grok-4.6:fast');
+    expect(selectable.find((model) => model.id === 'grok-4.6:fast')).toMatchObject({
+      name: 'Grok 4.6 Fast',
+      reasoning: true,
+      contextWindow: 500_000,
+      cost: { input: 4, output: 12, cacheRead: 1, cacheWrite: 0 },
+      thinkingLevelMap: { xhigh: 'xhigh' },
+    });
   });
 });

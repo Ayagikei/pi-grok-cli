@@ -1,3 +1,5 @@
+import { baseModelName } from '../models/catalog.js';
+
 // Grok CLI client version. Keep it in sync with the version the official Grok
 // CLI client emits (observed in captured cli-chat-proxy.grok.com traffic).
 export const GROK_CLI_VERSION = '0.2.91';
@@ -25,6 +27,6 @@ export function grokCliModelHeaders(modelId: string): Record<string, string> {
     'x-grok-client-identifier': GROK_CLI_CLIENT_IDENTIFIER,
     'x-grok-client-version': GROK_CLI_VERSION,
     'x-xai-token-auth': GROK_CLI_TOKEN_AUTH,
-    'x-grok-model-override': modelId,
+    'x-grok-model-override': baseModelName(modelId),
   };
 }

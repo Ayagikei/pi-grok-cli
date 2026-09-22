@@ -22,7 +22,12 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { extname, isAbsolute, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { supportsReasoning, supportsReasoningEffort } from '../models/catalog.js';
+import {
+  baseModelName,
+  isFastModel,
+  supportsReasoning,
+  supportsReasoningEffort,
+} from '../models/catalog.js';
 
 const ENCRYPTED_REASONING_INCLUDE = 'reasoning.encrypted_content';
 
@@ -358,6 +363,9 @@ export function sanitizePayload(
   if (sessionId && !next.prompt_cache_key) {
     next.prompt_cache_key = sessionId;
   }
+
+  if (isFastModel(modelId)) next.service_tier = 'priority';
+  if (typeof next.model === 'string') next.model = baseModelName(next.model);
 
   return next;
 }
