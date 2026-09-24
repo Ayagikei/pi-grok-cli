@@ -576,4 +576,85 @@ describe('payload sanitization', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('replaces images smaller than 8 pixels with a warning', () => {
+    const png = (width: number, height: number) => {
+      const bytes = Buffer.alloc(24);
+      bytes.writeUInt32BE(0x89504e47, 0);
+      bytes.writeUInt32BE(0x0d0a1a0a, 4);
+      bytes.writeUInt32BE(13, 8);
+      bytes.write('IHDR', 12, 'ascii');
+      bytes.writeUInt32BE(width, 16);
+      bytes.writeUInt32BE(height, 20);
+      return bytes;
+    };
+    const jpeg = (width: number, height: number) => {
+      const bytes = Buffer.alloc(19);
+      bytes[0] = 0xff;
+      bytes[1] = 0xd8;
+      bytes[2] = 0xff;
+      bytes[3] = 0xe0;
+      bytes.writeUInt16BE(4, 4);
+      bytes[8] = 0xff;
+      bytes[9] = 0xc0;
+      bytes.writeUInt16BE(8, 10);
+      bytes[12] = 8;
+      bytes.writeUInt16BE(height, 13);
+      bytes.writeUInt16BE(width, 15);
+      return bytes;
+    };
+    const dataUri = (bytes: Buffer, mime = 'image/png') =>
+      `data:${mime};base64,${bytes.toString('base64')}`;
+    const warning = (size: string, source?: string) =>
+      `Warning: omitted an image${source ? ` (${source})` : ''} that is ${size}. ` +
+      'xAI requires both width and height to be at least 8 pixels. Attach a larger image instead.';
+
+    const dir = mkdtempSync(join(tmpdir(), 'pi-grok-cli-test-'));
+    const imagePath = join(dir, 'tiny.png');
+    writeFileSync(imagePath, png(1, 1));
+    const kept = dataUri(png(8, 8));
+
+    try {
+      const payload = sanitizePayload(
+        {
+          input: [
+            {
+              role: 'user',
+              content: [
+                { type: 'input_image', image_url: dataUri(png(1, 1)) },
+                { type: 'input_image', image_url: imagePath },
+                { type: 'input_image', image_url: kept },
+                { type: 'input_image', image_url: dataUri(jpeg(3, 9), 'image/jpeg') },
+                { type: 'image', data: png(7, 20).toString('base64'), mimeType: 'image/png' },
+              ],
+            },
+            {
+              type: 'function_call_output',
+              call_id: 'call_tiny',
+              output: [{ type: 'input_image', image_url: dataUri(png(1, 1)) }],
+            },
+          ],
+        },
+        'grok-4.3',
+        undefined,
+        dir,
+      );
+
+      expect(payload.input).toEqual([
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: warning('1x1') },
+            { type: 'input_text', text: warning('1x1', imagePath) },
+            { type: 'input_image', image_url: kept, detail: 'auto' },
+            { type: 'input_text', text: warning('3x9') },
+            { type: 'input_text', text: warning('7x20') },
+          ],
+        },
+        { type: 'function_call_output', call_id: 'call_tiny', output: warning('1x1') },
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

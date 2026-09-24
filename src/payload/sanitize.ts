@@ -8,6 +8,7 @@
  *   - `function_call_output.output` cannot contain image arrays.
  *   - `image_url` parts must be normalized to `input_image` with data URIs.
  *   - Local image paths must be resolved to base64 data URIs.
+ *   - Images smaller than 8px are replaced with a warning so the session stays usable.
  *   - xAI rejects `role: "developer"` and `role: "system"` in the input
  *     array; these must be moved to top-level `instructions`.
  *   - xAI uses `text.format` instead of OpenAI's `response_format`.
@@ -125,6 +126,67 @@ function normalizeImageInput(value: unknown, cwd: string): string | undefined {
   return `data:${mimeType};base64,${data}`;
 }
 
+const MIN_IMAGE_EDGE = 8;
+
+function imageSize(bytes: Buffer): { width: number; height: number } | undefined {
+  if (
+    bytes.length >= 24 &&
+    bytes.readUInt32BE(0) === 0x89504e47 &&
+    bytes.readUInt32BE(4) === 0x0d0a1a0a
+  ) {
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  }
+
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
+
+  let offset = 2;
+  while (offset + 8 < bytes.length) {
+    if (bytes[offset] !== 0xff) return undefined;
+    while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
+    if (offset >= bytes.length) return undefined;
+    const marker = bytes[offset];
+    offset += 1;
+    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.length) return undefined;
+    const length = bytes.readUInt16BE(offset);
+    if (length < 2 || offset + length > bytes.length) return undefined;
+    const isSof =
+      marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof) {
+      if (offset + 7 > bytes.length) return undefined;
+      return { height: bytes.readUInt16BE(offset + 3), width: bytes.readUInt16BE(offset + 5) };
+    }
+    offset += length;
+  }
+  return undefined;
+}
+
+// ponytail: png/jpeg data URIs only. Remote URLs are not measured;
+// sniff them if a tiny remote image still 400s the session.
+function omittedTinyImage(
+  imageUrl: string,
+  source?: string,
+): { type: 'input_text'; text: string } | undefined {
+  const comma = imageUrl.indexOf(',');
+  if (
+    comma < 0 ||
+    !imageUrl.startsWith('data:image/') ||
+    !/;base64/i.test(imageUrl.slice(0, comma))
+  ) {
+    return undefined;
+  }
+  const size = imageSize(Buffer.from(imageUrl.slice(comma + 1), 'base64'));
+  if (!size || (size.width >= MIN_IMAGE_EDGE && size.height >= MIN_IMAGE_EDGE)) return undefined;
+  const where = source && !source.startsWith('data:') ? ` (${source})` : '';
+  return {
+    type: 'input_text',
+    text:
+      `Warning: omitted an image${where} that is ${size.width}x${size.height}. ` +
+      `xAI requires both width and height to be at least ${MIN_IMAGE_EDGE} pixels. ` +
+      'Attach a larger image instead.',
+  };
+}
+
 // ─── Content part normalization ───────────────────────────────────────────────
 
 function isInputImagePart(value: unknown): value is Record<string, unknown> {
@@ -154,11 +216,14 @@ function normalizeImageParts(value: unknown, cwd: string): unknown {
   const obj = { ...(value as Record<string, unknown>) };
 
   if (obj.type === 'image' && typeof obj.data === 'string' && typeof obj.mimeType === 'string') {
-    return {
-      type: 'input_image',
-      image_url: `data:${obj.mimeType};base64,${obj.data}`,
-      detail: typeof obj.detail === 'string' && obj.detail ? obj.detail : 'auto',
-    };
+    const imageUrl = `data:${obj.mimeType};base64,${obj.data}`;
+    return (
+      omittedTinyImage(imageUrl) ?? {
+        type: 'input_image',
+        image_url: imageUrl,
+        detail: typeof obj.detail === 'string' && obj.detail ? obj.detail : 'auto',
+      }
+    );
   }
 
   if (obj.type === 'image_url') {
@@ -172,6 +237,13 @@ function normalizeImageParts(value: unknown, cwd: string): unknown {
     const { imageUrl, detail } = getImageUrlAndDetail(obj);
     const normalized = normalizeImageInput(imageUrl, cwd);
     if (normalized) obj.image_url = normalized;
+    if (typeof obj.image_url === 'string') {
+      const omitted = omittedTinyImage(
+        obj.image_url,
+        typeof imageUrl === 'string' ? imageUrl : undefined,
+      );
+      if (omitted) return omitted;
+    }
     if (typeof detail === 'string' && detail) obj.detail = detail;
     if (typeof obj.detail !== 'string' || !obj.detail) obj.detail = 'auto';
   }
