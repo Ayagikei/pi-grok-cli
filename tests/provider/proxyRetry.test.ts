@@ -28,7 +28,7 @@ const failed: AssistantMessage = {
   model: 'grok-4.6',
   usage,
   stopReason: 'error',
-  errorMessage: 'OpenAI API error (401): 401 "Authentication required"',
+  errorMessage: 'grok-cli API error (401): 401 "Authentication required"',
   timestamp: 1,
 };
 

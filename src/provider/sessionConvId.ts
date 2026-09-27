@@ -5,7 +5,8 @@ const DEDUP_MS = 1000;
 
 export function isProxySessionError(errorMessage: unknown) {
   return (
-    typeof errorMessage === 'string' && /OpenAI API error \((401|502|520)\)/.test(errorMessage)
+    typeof errorMessage === 'string' &&
+    /(?:OpenAI|grok-cli) API error \((401|502|520)\)/.test(errorMessage)
   );
 }
 

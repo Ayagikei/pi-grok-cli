@@ -804,7 +804,7 @@ describe('Grok CLI provider registration', () => {
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
       },
       stopReason: 'error' as const,
-      errorMessage: 'OpenAI API error (401): 401 "Authentication required"',
+      errorMessage: 'grok-cli API error (401): 401 "Authentication required"',
       timestamp: 1,
     };
     mockProviderStream

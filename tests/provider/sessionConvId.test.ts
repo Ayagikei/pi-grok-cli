@@ -30,6 +30,9 @@ function context(sessionId: string, generations: number[] = []) {
 describe('proxy session errors', () => {
   it('matches grok proxy 401/502/520 wrappers only', () => {
     expect(isProxySessionError('OpenAI API error (401): 401 "Authentication required"')).toBe(true);
+    expect(isProxySessionError('grok-cli API error (401): 401 "Authentication required"')).toBe(
+      true,
+    );
     expect(isProxySessionError('OpenAI API error (502): 502 status code (no body)')).toBe(true);
     expect(isProxySessionError('OpenAI API error (520): 520 status code (no body)')).toBe(true);
     expect(
